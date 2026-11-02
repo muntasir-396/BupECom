@@ -6,11 +6,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   GraduationCap,
   ShoppingBag,
-  Store
+  Store,
+  ShoppingCart,
+  Package
 } from 'lucide-react'
 import { useWorkspace, WorkspaceTab } from './WorkspaceContext'
 import { SessionUser } from '@/lib/auth'
 import { logoutAction } from '@/lib/actions/auth'
+import { useCart } from '@/components/marketplace/CartProvider'
 
 interface WorkspaceHeaderProps {
   user: SessionUser | null
@@ -18,6 +21,7 @@ interface WorkspaceHeaderProps {
 
 export function WorkspaceHeader({ user }: WorkspaceHeaderProps) {
   const { activeTab, setActiveTab } = useWorkspace()
+  const { count: cartCount } = useCart()
   const pathname = usePathname()
   const router = useRouter()
 
@@ -103,6 +107,11 @@ export function WorkspaceHeader({ user }: WorkspaceHeaderProps) {
                 <span className="text-xs sm:text-[15px] font-bold tracking-tight">Buyer</span>
                 <span className="text-xs sm:text-[15px] font-bold tracking-tight">Market</span>
               </div>
+              {user && !user.hasBuyerAccount && (
+                <span className="ml-1 rounded-full bg-amber-500/20 text-amber-900 border border-amber-600/30 px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider hidden sm:inline-block">
+                  Connect
+                </span>
+              )}
             </button>
 
             {/* Desktop 3: Seller Studio */}
@@ -120,25 +129,79 @@ export function WorkspaceHeader({ user }: WorkspaceHeaderProps) {
                 <span className="text-xs sm:text-[15px] font-bold tracking-tight">Seller</span>
                 <span className="text-xs sm:text-[15px] font-bold tracking-tight">Studio</span>
               </div>
+              {user && !user.hasSellerAccount && (
+                <span className="ml-1 rounded-full bg-[#E3E890]/40 text-[#392525] border border-[#392525]/20 px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider hidden sm:inline-block">
+                  Open Stall
+                </span>
+              )}
             </button>
           </nav>
         </div>
 
-        {/* Right: Clean User Status / Auth */}
+        {/* Right: Cart & Clean User Status / Auth */}
         <div className="flex items-center justify-end gap-2">
+          {/* Quick Cart Link */}
+          <Link
+            href="/cart"
+            className="relative inline-flex items-center justify-center rounded-full border border-[#392525]/15 bg-white/80 p-2 text-[#392525] hover:bg-white hover:text-[#B25D3E] transition shadow-xs"
+            title="Shopping Cart"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#B25D3E] px-1 text-[10px] font-bold text-white shadow-sm">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+
           {user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Quick links for desktop */}
+              {user.hasBuyerAccount && (
+                <Link
+                  href="/orders"
+                  className="hidden md:inline-flex items-center gap-1 text-xs font-semibold text-[#392525]/80 hover:text-[#B25D3E] transition px-2 py-1 rounded-full hover:bg-black/5"
+                  title="My Orders"
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  <span>Orders</span>
+                </Link>
+              )}
+              {user.hasSellerAccount && (
+                <Link
+                  href="/seller"
+                  className="hidden md:inline-flex items-center gap-1 text-xs font-semibold text-[#392525]/80 hover:text-[#213527] transition px-2 py-1 rounded-full hover:bg-black/5"
+                  title="Seller Studio"
+                >
+                  <Store className="h-3.5 w-3.5 text-[#B25D3E]" />
+                  <span>Studio</span>
+                </Link>
+              )}
+
               <div
-                className="flex items-center gap-1.5 rounded-full border border-[#392525]/15 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#392525]"
-                title="Signed in campus account"
+                className="flex items-center gap-2 rounded-full border border-[#392525]/15 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#392525]"
+                title={`Signed in as ${user.name} (${user.isBothConnected ? 'Connected: Buyer & Seller' : user.hasSellerAccount ? 'Seller Account' : 'Buyer Account'})`}
               >
                 <span className="size-2 rounded-full bg-emerald-500" />
-                <span className="max-w-[120px] truncate">{user.name}</span>
+                <span className="max-w-[100px] truncate">{user.name}</span>
+                {user.isBothConnected ? (
+                  <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider hidden lg:inline-block">
+                    Connected
+                  </span>
+                ) : user.hasSellerAccount ? (
+                  <span className="rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider hidden lg:inline-block">
+                    Seller
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider hidden lg:inline-block">
+                    Buyer
+                  </span>
+                )}
               </div>
               <form action={logoutAction}>
                 <button
                   type="submit"
-                  className="rounded-full border border-[#392525]/15 bg-transparent px-2.5 py-1.5 text-[11px] font-medium text-[#728383] hover:text-[#392525] transition"
+                  className="rounded-full border border-[#392525]/15 bg-transparent px-2.5 py-1.5 text-[11px] font-medium text-[#728383] hover:text-[#392525] transition cursor-pointer"
                   title="Sign out"
                 >
                   Sign out

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { Product } from '@/lib/types'
 import { useWorkspace } from './WorkspaceContext'
+import { openBuyerAccountAction } from '@/lib/actions/auth'
 
 interface BuyerWorkspaceProps {
   products: Product[]
@@ -97,7 +98,7 @@ export function BuyerWorkspace({
   onOpenCart,
   cartCount = 0,
 }: BuyerWorkspaceProps) {
-  const { setActiveTab } = useWorkspace()
+  const { user, hasBuyerAccount, isBothConnected, setActiveTab } = useWorkspace()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [selectedMealType, setSelectedMealType] = useState<MealFilter>('All')
@@ -295,6 +296,31 @@ export function BuyerWorkspace({
   return (
     <div className="w-full bg-[#211515] text-[#FAF5E9] pb-24 min-h-screen">
       
+      {/* Banner if user is currently Seller only */}
+      {user && !hasBuyerAccount && (
+        <div className="bg-amber-950/80 border-b border-amber-500/30 px-4 py-2.5 text-xs text-amber-200">
+          <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>🛍️ <strong>Seller Account Active:</strong> You are signed in as a seller ({user.name}). Open your Buyer account to order campus items and connect both accounts.</span>
+            </div>
+            <form
+              action={async () => {
+                await openBuyerAccountAction()
+                window.location.reload()
+              }}
+            >
+              <button
+                type="submit"
+                className="rounded-full bg-[#E3E890] px-3 py-1 text-xs font-bold text-[#141f17] shadow-sm hover:bg-white transition cursor-pointer"
+              >
+                + Open Buyer Account &amp; Connect Both
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* BUYER HEADER & VALUE PROP BANNER */}
       <section className="border-b border-white/10 bg-gradient-to-b from-[#180f0f] via-[#211515] to-[#211515] px-4 py-8 sm:px-8 sm:py-12">
         <div className="mx-auto max-w-7xl">

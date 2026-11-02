@@ -19,7 +19,7 @@ function LoginForm() {
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12">
       <h1 className="font-serif text-4xl text-[#392525]">Sign in</h1>
       <p className="mt-2 text-sm text-[#3E4734]">
-        Access your buyer cart, track campus orders, or manage your seller hub.
+        Sign in to your Buyer Account, Seller Account, or Connected Accounts.
       </p>
 
       {redirectUrl && redirectUrl !== '/' && (
@@ -96,9 +96,9 @@ function LoginForm() {
 
       <div className="mt-6 rounded-2xl border border-[rgba(57,37,37,0.1)] bg-[#E3E890]/40 p-4 text-xs text-[#3E4734]">
         <p className="font-semibold text-[#392525]">Demo credentials (password: password123):</p>
-        <p className="mt-1">Buyer: <code className="font-mono text-[#392525]">buyer@example.com</code></p>
-        <p>Seller: <code className="font-mono text-[#392525]">alumni@bupnest.com</code></p>
-        <p>Admin: <code className="font-mono text-[#392525]">admin@bupnest.com</code></p>
+        <p className="mt-1">🛍️ Buyer Account: <code className="font-mono text-[#392525]">buyer@example.com</code></p>
+        <p>🏪 Seller Account: <code className="font-mono text-[#392525]">alumni@bupnest.com</code></p>
+        <p>✨ Connected (Both): <code className="font-mono text-[#392525]">admin@bupnest.com</code></p>
       </div>
 
       <p className="mt-6 text-center text-sm text-[#3E4734]">

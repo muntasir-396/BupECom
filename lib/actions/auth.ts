@@ -10,7 +10,14 @@ import {
   hashPassword,
   verifyPassword,
 } from '@/lib/auth'
-import { createUser, findUserByEmail, upgradeUserToSeller, updateUserProfile } from '@/lib/catalog'
+import {
+  createUser,
+  findUserByEmail,
+  upgradeUserToSeller,
+  openSellerAccount,
+  openBuyerAccount,
+  updateUserProfile,
+} from '@/lib/catalog'
 import { ensureSeeded } from '@/lib/seed'
 
 const loginSchema = z.object({
@@ -24,8 +31,10 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   password: z.string().min(6),
   role: z.enum(['BUYER', 'SELLER']).optional(),
+  connectBoth: z.boolean().optional(),
   storeName: z.string().optional(),
   sellerType: z.string().optional(),
+  storeDescription: z.string().optional(),
   studentId: z.string().optional(),
 })
 
@@ -39,18 +48,11 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
   })
   if (!parsed.success) return { ok: false, error: 'Invalid email or password' }
 
-  let user = findUserByEmail(parsed.data.email)
+  const user = findUserByEmail(parsed.data.email)
   if (!user) return { ok: false, error: 'No account found with this email' }
 
   const valid = await verifyPassword(parsed.data.password, user.password_hash)
   if (!valid) return { ok: false, error: 'Incorrect password' }
-
-  // Unified account: ensure all accounts have full buying and selling privileges
-  if (user.role === 'BUYER') {
-    const db = getDb()
-    db.prepare(`UPDATE users SET role = 'SELLER', store_name = COALESCE(store_name, ? || '''s Stall') WHERE id = ?`).run(user.name, user.id)
-    user = findUserByEmail(parsed.data.email)!
-  }
 
   await createSession(user)
   return { ok: true }
@@ -58,14 +60,19 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
 
 export async function registerAction(formData: FormData): Promise<ActionResult> {
   await ensureSeeded()
+  const accountType = (formData.get('role') as 'BUYER' | 'SELLER') || 'BUYER'
+  const connectBoth = formData.get('connectBoth') === 'true' || formData.get('connectBoth') === 'on'
+
   const parsed = registerSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
     phone: formData.get('phone') || undefined,
     password: formData.get('password'),
-    role: (formData.get('role') as 'BUYER' | 'SELLER') || 'SELLER',
+    role: accountType,
+    connectBoth,
     storeName: formData.get('storeName') || undefined,
     sellerType: formData.get('sellerType') || undefined,
+    storeDescription: formData.get('storeDescription') || undefined,
     studentId: formData.get('studentId') || undefined,
   })
 
@@ -77,33 +84,50 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
 
   const passwordHash = await hashPassword(parsed.data.password)
   const isBup = parsed.data.email.toLowerCase().endsWith('@bup.edu.bd') || !!parsed.data.studentId
-  const storeName = parsed.data.storeName?.trim() || `${parsed.data.name}'s Stall`
 
-  // One unified account grants both buyer & seller capabilities
+  let hasBuyer = true
+  let hasSeller = false
+  let storeName: string | undefined = undefined
+
+  if (accountType === 'BUYER') {
+    hasBuyer = true
+    hasSeller = connectBoth
+    if (connectBoth) {
+      storeName = parsed.data.storeName?.trim() || `${parsed.data.name}'s Stall`
+    }
+  } else {
+    // SELLER
+    hasSeller = true
+    hasBuyer = connectBoth
+    storeName = parsed.data.storeName?.trim() || `${parsed.data.name}'s Stall`
+  }
+
   const user = createUser({
     email: parsed.data.email,
     passwordHash,
     name: parsed.data.name,
     phone: parsed.data.phone,
-    role: 'SELLER',
+    role: accountType,
+    hasBuyerAccount: hasBuyer,
+    hasSellerAccount: hasSeller,
     studentId: parsed.data.studentId,
     isBupVerified: isBup,
     storeName: storeName,
-    storeDescription: `${storeName} on BUP Nest`,
-    sellerType: parsed.data.sellerType || 'Student Vendor',
+    storeDescription: storeName ? (parsed.data.storeDescription || `${storeName} on BUP Nest`) : undefined,
+    sellerType: hasSeller ? (parsed.data.sellerType || 'Student Vendor') : undefined,
   })
 
   await createSession(user)
   return { ok: true }
 }
 
-export async function upgradeToSellerAction(formData: FormData): Promise<ActionResult> {
+export async function openSellerAccountAction(formData: FormData): Promise<ActionResult> {
   await ensureSeeded()
   const user = await getSession()
   if (!user) return { ok: false, error: 'Please sign in first' }
 
   const storeName = String(formData.get('storeName') || '').trim()
-  const sellerType = String(formData.get('sellerType') || 'Independent Seller').trim()
+  const sellerType = String(formData.get('sellerType') || 'Student Vendor').trim()
   const phone = String(formData.get('phone') || '').trim()
   const storeDescription = String(formData.get('storeDescription') || '').trim()
 
@@ -111,17 +135,33 @@ export async function upgradeToSellerAction(formData: FormData): Promise<ActionR
     return { ok: false, error: 'Store name is required (at least 2 characters)' }
   }
 
-  const updated = upgradeUserToSeller(user.id, {
+  const updated = openSellerAccount(user.id, {
     storeName,
     sellerType,
     phone: phone || undefined,
     storeDescription: storeDescription || `${storeName} on BUP Nest`,
   })
 
-  if (!updated) return { ok: false, error: 'Failed to upgrade account' }
+  if (!updated) return { ok: false, error: 'Failed to open seller account' }
 
   await createSession(updated)
   return { ok: true }
+}
+
+export async function openBuyerAccountAction(): Promise<ActionResult> {
+  await ensureSeeded()
+  const user = await getSession()
+  if (!user) return { ok: false, error: 'Please sign in first' }
+
+  const updated = openBuyerAccount(user.id)
+  if (!updated) return { ok: false, error: 'Failed to connect buyer account' }
+
+  await createSession(updated)
+  return { ok: true }
+}
+
+export async function upgradeToSellerAction(formData: FormData): Promise<ActionResult> {
+  return openSellerAccountAction(formData)
 }
 
 export async function updateUserProfileAction(formData: FormData): Promise<ActionResult> {

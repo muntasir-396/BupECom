@@ -22,6 +22,10 @@ export type ActionResult = { ok: true; id?: string } | { ok: false; error: strin
 export async function createProductAction(formData: FormData): Promise<ActionResult> {
   try {
     const user = await requireUser(['SELLER', 'ADMIN'])
+    if (!user.hasSellerAccount && user.role !== 'ADMIN') {
+      return { ok: false, error: 'You must activate a seller account first' }
+    }
+
     const parsed = productSchema.safeParse({
       name: formData.get('name'),
       description: formData.get('description'),
@@ -42,6 +46,9 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
       tag: parsed.data.tag ?? null,
     })
 
+    revalidatePath('/seller')
+    revalidatePath('/shop')
+    revalidatePath(`/product/${product.id}`)
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true, id: product.id }
@@ -53,6 +60,10 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
 export async function updateProductAction(productId: string, formData: FormData): Promise<ActionResult> {
   try {
     const user = await requireUser(['SELLER', 'ADMIN'])
+    if (!user.hasSellerAccount && user.role !== 'ADMIN') {
+      return { ok: false, error: 'You must activate a seller account first' }
+    }
+
     const parsed = productSchema.safeParse({
       name: formData.get('name'),
       description: formData.get('description'),
@@ -72,9 +83,11 @@ export async function updateProductAction(productId: string, formData: FormData)
       tag: parsed.data.tag ?? null,
       isActive: formData.has('isActive'),
     })
-    if (!updated) return { ok: false, error: 'Product not found' }
+    if (!updated) return { ok: false, error: 'Product not found or unauthorized' }
 
     revalidatePath('/seller')
+    revalidatePath('/shop')
+    revalidatePath(`/product/${productId}`)
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true, id: productId }
@@ -86,9 +99,15 @@ export async function updateProductAction(productId: string, formData: FormData)
 export async function deleteProductAction(productId: string): Promise<ActionResult> {
   try {
     const user = await requireUser(['SELLER', 'ADMIN'])
-    const ok = deleteProduct(productId, user.id)
-    if (!ok) return { ok: false, error: 'Product not found' }
+    if (!user.hasSellerAccount && user.role !== 'ADMIN') {
+      return { ok: false, error: 'You must activate a seller account first' }
+    }
+
+    const ok = deleteProduct(productId, user.id, user.role === 'ADMIN')
+    if (!ok) return { ok: false, error: 'Product not found or unauthorized' }
     revalidatePath('/seller')
+    revalidatePath('/shop')
+    revalidatePath(`/product/${productId}`)
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true }

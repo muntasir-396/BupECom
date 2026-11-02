@@ -11,6 +11,8 @@ const checkoutSchema = z.object({
   deliveryAddress: z.string().optional(),
   phone: z.string().min(6),
   notes: z.string().optional(),
+  trxId: z.string().optional(),
+  senderPhone: z.string().optional(),
   items: z
     .array(
       z.object({
@@ -27,9 +29,15 @@ export type CheckoutResult =
 
 export async function placeOrderAction(payload: unknown): Promise<CheckoutResult> {
   try {
-    const user = await requireUser(['BUYER', 'SELLER', 'ADMIN'])
+    const user = await requireUser(['BUYER', 'ADMIN'])
     const parsed = checkoutSchema.safeParse(payload)
     if (!parsed.success) return { ok: false, error: 'Invalid checkout data' }
+
+    if ((parsed.data.paymentMethod === 'BKASH' || parsed.data.paymentMethod === 'NAGAD')) {
+      if (!parsed.data.trxId || parsed.data.trxId.trim().length < 4) {
+        return { ok: false, error: `Valid Transaction ID (TrxID) is required for ${parsed.data.paymentMethod} payment.` }
+      }
+    }
 
     const lineItems = []
     let subtotal = 0
@@ -37,10 +45,10 @@ export async function placeOrderAction(payload: unknown): Promise<CheckoutResult
     for (const item of parsed.data.items) {
       const product = getProduct(item.productId)
       if (!product || !product.is_active) {
-        return { ok: false, error: 'One or more products are unavailable' }
+        return { ok: false, error: 'One or more products are unavailable or deactivated' }
       }
       if (product.stock < item.quantity) {
-        return { ok: false, error: `Not enough stock for ${product.name}` }
+        return { ok: false, error: `Not enough stock for ${product.name} (Available: ${product.stock})` }
       }
       subtotal += product.price * item.quantity
       lineItems.push({
@@ -57,9 +65,15 @@ export async function placeOrderAction(payload: unknown): Promise<CheckoutResult
     const deliveryFee = user.isBupVerified || subtotal > 1000 ? 0 : 60
     const total = subtotal - discount + deliveryFee
 
+    const paymentNote = parsed.data.senderPhone
+      ? `Sender Phone: ${parsed.data.senderPhone}. ${parsed.data.notes || ''}`.trim()
+      : parsed.data.notes
+
     const order = createOrder({
       buyerId: user.id,
       paymentMethod: parsed.data.paymentMethod,
+      paymentStatus: 'PENDING',
+      paymentTrxId: parsed.data.trxId,
       subtotal,
       deliveryFee,
       discount,
@@ -67,7 +81,7 @@ export async function placeOrderAction(payload: unknown): Promise<CheckoutResult
       deliveryCampus: parsed.data.deliveryCampus,
       deliveryAddress: parsed.data.deliveryAddress,
       phone: parsed.data.phone,
-      notes: parsed.data.notes,
+      notes: paymentNote,
       items: lineItems,
     })
 

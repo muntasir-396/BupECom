@@ -38,7 +38,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body className="antialiased min-h-screen flex flex-col bg-[#FAF5E9]">
         <CartProvider>
-          <WorkspaceProvider>
+          <WorkspaceProvider user={user}>
             <WorkspaceHeader user={user} />
             <main className="flex-1">{children}</main>
             <SiteFooter />

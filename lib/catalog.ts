@@ -108,8 +108,29 @@ export function updateProduct(
     isActive: boolean
   }>
 ) {
+  return updateProductWithOptions(id, sellerId, input, false)
+}
+
+export function updateProductWithOptions(
+  id: string,
+  sellerId: string,
+  input: Partial<{
+    name: string
+    description: string
+    category: string
+    price: number
+    originalPrice: number | null
+    image: string
+    stock: number
+    tag: string | null
+    deliveryTime: string
+    isActive: boolean
+  }>,
+  isAdmin = false
+) {
   const existing = getProduct(id)
-  if (!existing || existing.seller_id !== sellerId) return null
+  if (!existing) return null
+  if (!isAdmin && existing.seller_id !== sellerId) return null
 
   const name = input.name ?? existing.name
   const description = input.description ?? existing.description
@@ -123,33 +144,58 @@ export function updateProduct(
   const isActive = input.isActive !== undefined ? (input.isActive ? 1 : 0) : existing.is_active
 
   const db = getDb()
-  db.prepare(
-    `UPDATE products SET
-      name = ?, description = ?, category = ?, price = ?, original_price = ?,
-      image = ?, stock = ?, in_stock = ?, tag = ?, delivery_time = ?, is_active = ?,
-      updated_at = datetime('now')
-     WHERE id = ? AND seller_id = ?`
-  ).run(
-    name,
-    description,
-    category,
-    price,
-    originalPrice,
-    image,
-    stock,
-    stock > 0 ? 1 : 0,
-    tag,
-    deliveryTime,
-    isActive,
-    id,
-    sellerId
-  )
+  if (isAdmin) {
+    db.prepare(
+      `UPDATE products SET
+        name = ?, description = ?, category = ?, price = ?, original_price = ?,
+        image = ?, stock = ?, in_stock = ?, tag = ?, delivery_time = ?, is_active = ?,
+        updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(
+      name,
+      description,
+      category,
+      price,
+      originalPrice,
+      image,
+      stock,
+      stock > 0 ? 1 : 0,
+      tag,
+      deliveryTime,
+      isActive,
+      id
+    )
+  } else {
+    db.prepare(
+      `UPDATE products SET
+        name = ?, description = ?, category = ?, price = ?, original_price = ?,
+        image = ?, stock = ?, in_stock = ?, tag = ?, delivery_time = ?, is_active = ?,
+        updated_at = datetime('now')
+       WHERE id = ? AND seller_id = ?`
+    ).run(
+      name,
+      description,
+      category,
+      price,
+      originalPrice,
+      image,
+      stock,
+      stock > 0 ? 1 : 0,
+      tag,
+      deliveryTime,
+      isActive,
+      id,
+      sellerId
+    )
+  }
   return getProduct(id)
 }
 
-export function deleteProduct(id: string, sellerId: string) {
+export function deleteProduct(id: string, sellerId: string, isAdmin = false) {
   const db = getDb()
-  const result = db.prepare('DELETE FROM products WHERE id = ? AND seller_id = ?').run(id, sellerId)
+  const result = isAdmin
+    ? db.prepare('DELETE FROM products WHERE id = ?').run(id)
+    : db.prepare('DELETE FROM products WHERE id = ? AND seller_id = ?').run(id, sellerId)
   return result.changes > 0
 }
 
@@ -175,13 +221,18 @@ export function createUser(input: {
   storeName?: string
   storeDescription?: string
   sellerType?: string
+  hasBuyerAccount?: boolean
+  hasSellerAccount?: boolean
 }) {
   const db = getDb()
   const id = cuid()
+  const hasBuyer = input.hasBuyerAccount !== undefined ? (input.hasBuyerAccount ? 1 : 0) : (input.role === 'SELLER' ? 0 : 1)
+  const hasSeller = input.hasSellerAccount !== undefined ? (input.hasSellerAccount ? 1 : 0) : (input.role === 'SELLER' ? 1 : 0)
+
   db.prepare(
     `INSERT INTO users
-      (id, email, password_hash, name, phone, role, student_id, department, is_bup_verified, store_name, store_description, seller_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, email, password_hash, name, phone, role, student_id, department, is_bup_verified, store_name, store_description, seller_type, has_buyer_account, has_seller_account)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.email.toLowerCase(),
@@ -194,7 +245,9 @@ export function createUser(input: {
     input.isBupVerified ? 1 : 0,
     input.storeName ?? null,
     input.storeDescription ?? null,
-    input.sellerType ?? null
+    input.sellerType ?? null,
+    hasBuyer,
+    hasSeller
   )
   return findUserById(id)!
 }
@@ -202,26 +255,50 @@ export function createUser(input: {
 export function createOrder(input: {
   buyerId: string
   paymentMethod: 'COD' | 'BKASH' | 'NAGAD' | 'CARD'
-  subtotal: number
-  deliveryFee: number
-  discount: number
-  total: number
+  paymentStatus?: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
+  paymentTrxId?: string
+  subtotal?: number
+  deliveryFee?: number
+  discount?: number
+  total?: number
   deliveryCampus?: string
   deliveryAddress?: string
+  deliveryPoint?: string
+  buyerPhone?: string
+  deliveryNotes?: string
   phone?: string
   notes?: string
-  items: { productId: string; sellerId: string; name: string; price: number; quantity: number; image: string }[]
+  items: { productId: string; sellerId: string; name: string; price: number; quantity: number; image?: string }[]
 }) {
   const db = getDb()
   const id = cuid()
   const orderNumber = `BUP-${Math.floor(100000 + Math.random() * 900000)}`
-  const paymentStatus = input.paymentMethod === 'COD' ? 'PENDING' : 'PENDING'
+  const paymentStatus = input.paymentStatus || 'PENDING'
   const status = 'PENDING'
+  const trxId = input.paymentTrxId?.trim() || null
+
+  const computedSubtotal = input.items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const subtotal = typeof input.subtotal === 'number' ? input.subtotal : computedSubtotal
+  const deliveryFee = typeof input.deliveryFee === 'number' ? input.deliveryFee : 0
+  const discount = typeof input.discount === 'number' ? input.discount : 0
+  const total = typeof input.total === 'number' ? input.total : Math.max(0, subtotal + deliveryFee - discount)
+
+  const deliveryCampus = input.deliveryCampus ?? input.deliveryPoint ?? null
+  const deliveryAddress = input.deliveryAddress ?? input.deliveryPoint ?? null
+  const phone = input.phone ?? input.buyerPhone ?? null
+  const notes = input.notes ?? input.deliveryNotes ?? null
+
+  if (trxId) {
+    const existingTrx = db.prepare('SELECT 1 FROM orders WHERE payment_trx_id = ? LIMIT 1').get(trxId)
+    if (existingTrx) {
+      throw new Error('This Transaction ID (TrxID) has already been submitted for another order')
+    }
+  }
 
   const insertOrder = db.prepare(
     `INSERT INTO orders
-      (id, order_number, buyer_id, status, payment_method, payment_status, subtotal, delivery_fee, discount, total, delivery_campus, delivery_address, phone, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, order_number, buyer_id, status, payment_method, payment_status, payment_trx_id, seller_payout_status, subtotal, delivery_fee, discount, total, delivery_campus, delivery_address, phone, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'UNSETTLED', ?, ?, ?, ?, ?, ?, ?, ?)`
   )
   const insertItem = db.prepare(
     `INSERT INTO order_items (id, order_id, product_id, seller_id, name, price, quantity, image)
@@ -241,14 +318,15 @@ export function createOrder(input: {
       status,
       input.paymentMethod,
       paymentStatus,
-      input.subtotal,
-      input.deliveryFee,
-      input.discount,
-      input.total,
-      input.deliveryCampus ?? null,
-      input.deliveryAddress ?? null,
-      input.phone ?? null,
-      input.notes ?? null
+      trxId,
+      subtotal,
+      deliveryFee,
+      discount,
+      total,
+      deliveryCampus,
+      deliveryAddress,
+      phone,
+      notes
     )
 
     for (const item of input.items) {
@@ -256,7 +334,7 @@ export function createOrder(input: {
       if (stockResult.changes === 0) {
         throw new Error(`Insufficient stock for ${item.name}`)
       }
-      insertItem.run(cuid(), id, item.productId, item.sellerId, item.name, item.price, item.quantity, item.image)
+      insertItem.run(cuid(), id, item.productId, item.sellerId, item.name, item.price, item.quantity, item.image || '')
     }
     db.exec('COMMIT')
   } catch (e) {
@@ -315,11 +393,43 @@ export function listSellerOrders(sellerId: string) {
 
 export function updateOrderStatus(orderId: string, sellerId: string, status: string) {
   const db = getDb()
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as DbOrder | undefined
+  if (!order) return false
+
+  const sellerUser = db.prepare('SELECT role FROM users WHERE id = ?').get(sellerId) as { role: string } | undefined
+  const isAdmin = sellerUser?.role === 'ADMIN'
   const owned = db
     .prepare('SELECT 1 FROM order_items WHERE order_id = ? AND seller_id = ? LIMIT 1')
     .get(orderId, sellerId)
-  if (!owned) return false
-  db.prepare(`UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?`).run(status, orderId)
+
+  if (!owned && !isAdmin) return false
+
+  // If cancelling order, restore inventory
+  if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+    const items = db
+      .prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?')
+      .all(orderId) as { product_id: string; quantity: number }[]
+    const incStock = db.prepare(
+      'UPDATE products SET stock = stock + ?, in_stock = 1, updated_at = datetime("now") WHERE id = ?'
+    )
+
+    db.exec('BEGIN')
+    try {
+      db.prepare(`UPDATE orders SET status = 'CANCELLED', updated_at = datetime('now') WHERE id = ?`).run(orderId)
+      for (const item of items) {
+        incStock.run(item.quantity, item.product_id)
+      }
+      db.exec('COMMIT')
+      return true
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
+  // If delivered, mark payment settled for COD if delivered or update payout status
+  const payoutUpdate = status === 'DELIVERED' ? ", seller_payout_status = 'SETTLED', payment_status = 'PAID'" : ''
+  db.prepare(`UPDATE orders SET status = ? ${payoutUpdate}, updated_at = datetime('now') WHERE id = ?`).run(status, orderId)
   return true
 }
 
@@ -356,6 +466,7 @@ export function upgradeUserToSeller(
   db.prepare(
     `UPDATE users SET
       role = 'SELLER',
+      has_seller_account = 1,
       store_name = ?,
       seller_type = ?,
       store_description = ?,
@@ -369,6 +480,42 @@ export function upgradeUserToSeller(
     input.phone ?? null,
     userId
   )
+  return findUserById(userId)
+}
+
+export function openSellerAccount(
+  userId: string,
+  input: { storeName: string; sellerType?: string; phone?: string; storeDescription?: string }
+) {
+  const db = getDb()
+  db.prepare(
+    `UPDATE users SET
+      role = CASE WHEN role = 'ADMIN' THEN 'ADMIN' ELSE 'SELLER' END,
+      has_seller_account = 1,
+      store_name = ?,
+      seller_type = ?,
+      store_description = ?,
+      phone = COALESCE(?, phone),
+      updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(
+    input.storeName,
+    input.sellerType || 'Independent Seller',
+    input.storeDescription || `${input.storeName} on BUP Nest`,
+    input.phone ?? null,
+    userId
+  )
+  return findUserById(userId)
+}
+
+export function openBuyerAccount(userId: string) {
+  const db = getDb()
+  db.prepare(
+    `UPDATE users SET
+      has_buyer_account = 1,
+      updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(userId)
   return findUserById(userId)
 }
 

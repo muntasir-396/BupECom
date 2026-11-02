@@ -22,14 +22,13 @@ export async function ensureSeeded() {
       email: 'buyer@example.com',
       passwordHash: password,
       name: 'Tanvir Ahmed',
-      role: 'SELLER',
+      role: 'BUYER',
+      hasBuyerAccount: true,
+      hasSellerAccount: false,
       studentId: '22041108',
       department: 'ICE / FST',
       phone: '+880 1711 234567',
       isBupVerified: true,
-      storeName: "Tanvir's Campus Stall",
-      storeDescription: "Tanvir's campus corner on BUP Nest",
-      sellerType: 'Student Vendor',
     })
 
     const sellers = [

@@ -28,13 +28,15 @@ function migrate(db: DatabaseSync) {
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
       phone TEXT,
-      role TEXT NOT NULL DEFAULT 'SELLER',
+      role TEXT NOT NULL DEFAULT 'BUYER',
       student_id TEXT,
       department TEXT,
       is_bup_verified INTEGER NOT NULL DEFAULT 0,
       store_name TEXT,
       store_description TEXT,
       seller_type TEXT,
+      has_buyer_account INTEGER NOT NULL DEFAULT 1,
+      has_seller_account INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -111,12 +113,27 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
     CREATE INDEX IF NOT EXISTS idx_order_items_seller ON order_items(seller_id);
 
-    -- Unified accounts: upgrade any existing BUYER rows so all accounts have buy & sell capabilities
-    UPDATE users SET role = 'SELLER', store_name = COALESCE(store_name, name || '''s Stall') WHERE role = 'BUYER';
   `)
 
   try {
+    db.exec('ALTER TABLE users ADD COLUMN has_buyer_account INTEGER NOT NULL DEFAULT 1;')
+    db.exec('UPDATE users SET has_buyer_account = CASE WHEN role = "BUYER" OR role = "ADMIN" THEN 1 ELSE 0 END;')
+  } catch {}
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN has_seller_account INTEGER NOT NULL DEFAULT 0;')
+    db.exec('UPDATE users SET has_seller_account = CASE WHEN role = "SELLER" OR role = "ADMIN" THEN 1 ELSE 0 END;')
+  } catch {}
+  try {
     db.exec('ALTER TABLE products ADD COLUMN meal_type TEXT;')
+  } catch {}
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN payment_trx_id TEXT;')
+  } catch {}
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN seller_payout_status TEXT NOT NULL DEFAULT 'UNSETTLED';")
+  } catch {}
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN payout_notes TEXT;')
   } catch {}
 }
 
@@ -142,6 +159,8 @@ export type DbUser = {
   store_name: string | null
   store_description: string | null
   seller_type: string | null
+  has_buyer_account: number
+  has_seller_account: number
   created_at: string
   updated_at: string
 }
@@ -174,6 +193,9 @@ export type DbOrder = {
   status: OrderStatus
   payment_method: PaymentMethod
   payment_status: PaymentStatus
+  payment_trx_id: string | null
+  seller_payout_status: 'UNSETTLED' | 'SETTLED' | 'HELD'
+  payout_notes: string | null
   subtotal: number
   delivery_fee: number
   discount: number
