@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import { Stall, UserProfile } from '@/lib/types'
+import { createStallBookingAction } from '@/lib/actions/admin'
 
 interface StallBookingModalProps {
   stall: Stall | null
@@ -55,23 +56,31 @@ export function StallBookingModal({
   const totalCost = stall.dailyRate * durationDays
   const discountedCost = currentUser?.isBupVerified ? Math.round(totalCost * 0.85) : totalCost // 15% discount for BUP students
 
-  const handleSubmitBooking = (e: React.FormEvent) => {
+  const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    setTimeout(() => {
-      const code = `STALL-${stall.id}-${Math.floor(1000 + Math.random() * 9000)}`
-      setBookingPassCode(code)
-      setIsSubmitting(false)
-      setStep('success')
-      onBookingConfirmed(stall.id, {
-        code,
-        date: bookingDate,
-        duration: durationDays,
-        clubName: clubName || 'Independent Student Enterprise',
-        totalCost: discountedCost,
-      })
-    }, 700)
+    const fd = new FormData()
+    fd.append('stallId', stall.id)
+    fd.append('clubName', clubName || 'Independent Student Enterprise')
+    fd.append('purpose', stallPurpose)
+    fd.append('bookingDate', bookingDate)
+    fd.append('durationDays', String(durationDays))
+    fd.append('dailyRate', String(stall.dailyRate))
+
+    const res = await createStallBookingAction(fd)
+    const code = res.ok && res.data ? res.data.passCode : `STALL-${stall.id}-${Math.floor(1000 + Math.random() * 9000)}`
+
+    setBookingPassCode(code)
+    setIsSubmitting(false)
+    setStep('success')
+    onBookingConfirmed(stall.id, {
+      code,
+      date: bookingDate,
+      duration: durationDays,
+      clubName: clubName || 'Independent Student Enterprise',
+      totalCost: discountedCost,
+    })
   }
 
   return (

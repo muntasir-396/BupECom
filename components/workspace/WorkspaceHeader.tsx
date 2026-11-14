@@ -8,7 +8,8 @@ import {
   ShoppingBag,
   Store,
   ShoppingCart,
-  Package
+  Package,
+  ShieldCheck
 } from 'lucide-react'
 import { useWorkspace, WorkspaceTab } from './WorkspaceContext'
 import { SessionUser } from '@/lib/auth'
@@ -175,6 +176,17 @@ export function WorkspaceHeader({ user }: WorkspaceHeaderProps) {
                 >
                   <Store className="h-3.5 w-3.5 text-[#B25D3E]" />
                   <span>Studio</span>
+                </Link>
+              )}
+
+              {user.role === 'ADMIN' && (
+                <Link
+                  href="/admin"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#392525] px-3 py-1.5 text-xs font-bold text-[#E3E890] shadow-sm hover:bg-[#213527] transition border border-[#E3E890]/40"
+                  title="Master Admin Panel"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#E3E890]" />
+                  <span>Admin</span>
                 </Link>
               )}
 

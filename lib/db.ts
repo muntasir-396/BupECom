@@ -135,6 +135,48 @@ function migrate(db: DatabaseSync) {
   try {
     db.exec('ALTER TABLE orders ADD COLUMN payout_notes TEXT;')
   } catch {}
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN is_suspended INTEGER NOT NULL DEFAULT 0;')
+  } catch {}
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stall_bookings (
+      id TEXT PRIMARY KEY,
+      stall_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      club_name TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      booking_date TEXT NOT NULL,
+      duration_days INTEGER NOT NULL DEFAULT 1,
+      total_cost REAL NOT NULL,
+      pass_code TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+      admin_notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      admin_name TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_entity TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stall_bookings_user ON stall_bookings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+  `)
 }
 
 export function cuid() {
@@ -161,7 +203,41 @@ export type DbUser = {
   seller_type: string | null
   has_buyer_account: number
   has_seller_account: number
+  is_suspended?: number
   created_at: string
+  updated_at: string
+}
+
+export type DbStallBooking = {
+  id: string
+  stall_id: string
+  user_id: string
+  club_name: string
+  purpose: string
+  booking_date: string
+  duration_days: number
+  total_cost: number
+  pass_code: string
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DbAuditLog = {
+  id: string
+  admin_id: string
+  admin_name: string
+  action: string
+  target_entity: string
+  target_id: string
+  details: string | null
+  created_at: string
+}
+
+export type DbPlatformSetting = {
+  key: string
+  value: string
   updated_at: string
 }
 

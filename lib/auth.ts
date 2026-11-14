@@ -111,4 +111,11 @@ export async function requireUser(roles?: Role[]) {
   return user
 }
 
+export async function requireAdmin() {
+  const user = await getSession()
+  if (!user) throw new Error('Unauthorized')
+  if (user.role !== 'ADMIN') throw new Error('Forbidden: Platform Administrator access required')
+  return user
+}
+
 export { toSession }

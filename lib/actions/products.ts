@@ -6,13 +6,13 @@ import { requireUser } from '@/lib/auth'
 import { createProduct, deleteProduct, updateProduct, addOrUpdateReview } from '@/lib/catalog'
 
 const productSchema = z.object({
-  name: z.string().min(3),
-  description: z.string().min(10),
-  category: z.string().min(2),
-  price: z.coerce.number().positive(),
-  originalPrice: z.coerce.number().positive().optional().nullable(),
-  image: z.string().url(),
-  stock: z.coerce.number().int().min(0),
+  name: z.string().min(3, 'Product title must be at least 3 characters'),
+  description: z.string().min(5, 'Detailed description must be at least 5 characters'),
+  category: z.string().min(2, 'Please select a category'),
+  price: z.coerce.number().positive('Selling price must be greater than 0'),
+  originalPrice: z.coerce.number().positive('Compare-at price must be greater than 0').optional().nullable(),
+  image: z.string().url('Product image must be a valid URL'),
+  stock: z.coerce.number().int().min(0, 'Available stock cannot be negative'),
   tag: z.string().optional().nullable(),
   deliveryTime: z.string().optional(),
 })
@@ -26,18 +26,27 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
       return { ok: false, error: 'You must activate a seller account first' }
     }
 
+    const originalPriceRaw = formData.get('originalPrice')
+    const originalPrice = originalPriceRaw && String(originalPriceRaw).trim() !== '' ? originalPriceRaw : null
+
+    const tagRaw = formData.get('tag')
+    const tag = tagRaw && String(tagRaw).trim() !== '' ? String(tagRaw).trim() : null
+
     const parsed = productSchema.safeParse({
       name: formData.get('name'),
       description: formData.get('description'),
       category: formData.get('category'),
       price: formData.get('price'),
-      originalPrice: formData.get('originalPrice') || null,
+      originalPrice,
       image: formData.get('image'),
       stock: formData.get('stock'),
-      tag: formData.get('tag') || null,
+      tag,
       deliveryTime: formData.get('deliveryTime') || '2-4 days',
     })
-    if (!parsed.success) return { ok: false, error: 'Please check product fields' }
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]
+      return { ok: false, error: firstIssue ? `${firstIssue.path.join('.')}: ${firstIssue.message}` : 'Please check product fields' }
+    }
 
     const product = createProduct({
       sellerId: user.id,
@@ -52,8 +61,8 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true, id: product.id }
-  } catch {
-    return { ok: false, error: 'You must be a seller to list products' }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'You must be a seller to list products' }
   }
 }
 
@@ -64,18 +73,27 @@ export async function updateProductAction(productId: string, formData: FormData)
       return { ok: false, error: 'You must activate a seller account first' }
     }
 
+    const originalPriceRaw = formData.get('originalPrice')
+    const originalPrice = originalPriceRaw && String(originalPriceRaw).trim() !== '' ? originalPriceRaw : null
+
+    const tagRaw = formData.get('tag')
+    const tag = tagRaw && String(tagRaw).trim() !== '' ? String(tagRaw).trim() : null
+
     const parsed = productSchema.safeParse({
       name: formData.get('name'),
       description: formData.get('description'),
       category: formData.get('category'),
       price: formData.get('price'),
-      originalPrice: formData.get('originalPrice') || null,
+      originalPrice,
       image: formData.get('image'),
       stock: formData.get('stock'),
-      tag: formData.get('tag') || null,
+      tag,
       deliveryTime: formData.get('deliveryTime') || '2-4 days',
     })
-    if (!parsed.success) return { ok: false, error: 'Please check product fields' }
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]
+      return { ok: false, error: firstIssue ? `${firstIssue.path.join('.')}: ${firstIssue.message}` : 'Please check product fields' }
+    }
 
     const updated = updateProduct(productId, user.id, {
       ...parsed.data,
@@ -91,8 +109,8 @@ export async function updateProductAction(productId: string, formData: FormData)
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true, id: productId }
-  } catch {
-    return { ok: false, error: 'Unable to update product' }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Unable to update product' }
   }
 }
 
