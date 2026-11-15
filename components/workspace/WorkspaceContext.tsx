@@ -6,13 +6,16 @@ import type { SessionUser } from '@/lib/auth'
 export type WorkspaceTab = 'hub' | 'buyer' | 'seller'
 
 interface WorkspaceContextType {
+  user: SessionUser | null
   activeTab: WorkspaceTab
   setActiveTab: (tab: WorkspaceTab) => void
   tabIndex: number
   isTransitioning: boolean
   slideNext: () => void
   slidePrev: () => void
-  user: SessionUser | null
+  hasBuyerAccount: boolean
+  hasSellerAccount: boolean
+  isBothConnected: boolean
 }
 
 const TABS: WorkspaceTab[] = ['hub', 'buyer', 'seller']
@@ -33,6 +36,10 @@ export function WorkspaceProvider({
   useEffect(() => {
     setCurrentUser(user)
   }, [user])
+
+  const hasBuyerAccount = Boolean(user?.hasBuyerAccount)
+  const hasSellerAccount = Boolean(user?.hasSellerAccount)
+  const isBothConnected = Boolean(user?.isBothConnected)
 
   // Initialize from URL search param if present (?tab=buyer or ?tab=seller)
   useEffect(() => {
@@ -130,6 +137,9 @@ export function WorkspaceProvider({
         slideNext,
         slidePrev,
         user: currentUser,
+        hasBuyerAccount,
+        hasSellerAccount,
+        isBothConnected,
       }}
     >
       {children}

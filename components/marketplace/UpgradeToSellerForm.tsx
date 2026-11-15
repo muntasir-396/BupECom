@@ -20,13 +20,13 @@ export function UpgradeToSellerForm({ userName, userPhone }: UpgradeFormProps) {
     <div className="rounded-3xl border border-[rgba(57,37,37,0.15)] bg-white/95 p-6 shadow-2xl backdrop-blur-md md:p-8">
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#B25D3E]">
         <Sparkles className="h-4 w-4" />
-        <span>Instant Seller Activation</span>
+        <span>Connect Seller Account</span>
       </div>
       <h2 className="mt-2 font-serif text-2xl text-[#392525] sm:text-3xl">
-        Activate your store, {userName}
+        Open Seller Account, {userName}
       </h2>
       <p className="mt-2 text-sm text-[#3E4734]">
-        You are currently signed in as a buyer. Set up your store name below to immediately list merchandise, textbooks, food, or electronics for the campus.
+        Buyer and Seller accounts are kept separate. You currently hold an active Buyer account. Open your seller store below to connect both accounts and switch freely between Buyer Market and Seller Studio anytime.
       </p>
 
       <form
@@ -41,8 +41,7 @@ export function UpgradeToSellerForm({ userName, userPhone }: UpgradeFormProps) {
               setError(res.error)
               return
             }
-            router.push('/seller')
-            router.refresh()
+            window.location.href = '/?tab=seller'
           })
         }}
       >

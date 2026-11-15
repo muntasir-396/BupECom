@@ -115,6 +115,8 @@ export function CheckoutForm({ user }: { user: UserProp }) {
                 deliveryAddress: String(fd.get('deliveryAddress') || ''),
                 phone: String(fd.get('phone') || ''),
                 notes: `${rawNotes}${mobilePayInfo}`.trim(),
+                trxId: trxId.trim() || undefined,
+                senderPhone: senderPhone.trim() || undefined,
                 items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
               })
 

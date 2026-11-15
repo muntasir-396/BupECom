@@ -28,13 +28,15 @@ function migrate(db: DatabaseSync) {
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
       phone TEXT,
-      role TEXT NOT NULL DEFAULT 'SELLER',
+      role TEXT NOT NULL DEFAULT 'BUYER',
       student_id TEXT,
       department TEXT,
       is_bup_verified INTEGER NOT NULL DEFAULT 0,
       store_name TEXT,
       store_description TEXT,
       seller_type TEXT,
+      has_buyer_account INTEGER NOT NULL DEFAULT 1,
+      has_seller_account INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -111,13 +113,70 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
     CREATE INDEX IF NOT EXISTS idx_order_items_seller ON order_items(seller_id);
 
-    -- Unified accounts: upgrade any existing BUYER rows so all accounts have buy & sell capabilities
-    UPDATE users SET role = 'SELLER', store_name = COALESCE(store_name, name || '''s Stall') WHERE role = 'BUYER';
   `)
 
   try {
+    db.exec('ALTER TABLE users ADD COLUMN has_buyer_account INTEGER NOT NULL DEFAULT 1;')
+    db.exec('UPDATE users SET has_buyer_account = CASE WHEN role = "BUYER" OR role = "ADMIN" THEN 1 ELSE 0 END;')
+  } catch {}
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN has_seller_account INTEGER NOT NULL DEFAULT 0;')
+    db.exec('UPDATE users SET has_seller_account = CASE WHEN role = "SELLER" OR role = "ADMIN" THEN 1 ELSE 0 END;')
+  } catch {}
+  try {
     db.exec('ALTER TABLE products ADD COLUMN meal_type TEXT;')
   } catch {}
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN payment_trx_id TEXT;')
+  } catch {}
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN seller_payout_status TEXT NOT NULL DEFAULT 'UNSETTLED';")
+  } catch {}
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN payout_notes TEXT;')
+  } catch {}
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN is_suspended INTEGER NOT NULL DEFAULT 0;')
+  } catch {}
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stall_bookings (
+      id TEXT PRIMARY KEY,
+      stall_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      club_name TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      booking_date TEXT NOT NULL,
+      duration_days INTEGER NOT NULL DEFAULT 1,
+      total_cost REAL NOT NULL,
+      pass_code TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+      admin_notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL,
+      admin_name TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_entity TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stall_bookings_user ON stall_bookings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+  `)
 }
 
 export function cuid() {
@@ -142,7 +201,43 @@ export type DbUser = {
   store_name: string | null
   store_description: string | null
   seller_type: string | null
+  has_buyer_account: number
+  has_seller_account: number
+  is_suspended?: number
   created_at: string
+  updated_at: string
+}
+
+export type DbStallBooking = {
+  id: string
+  stall_id: string
+  user_id: string
+  club_name: string
+  purpose: string
+  booking_date: string
+  duration_days: number
+  total_cost: number
+  pass_code: string
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DbAuditLog = {
+  id: string
+  admin_id: string
+  admin_name: string
+  action: string
+  target_entity: string
+  target_id: string
+  details: string | null
+  created_at: string
+}
+
+export type DbPlatformSetting = {
+  key: string
+  value: string
   updated_at: string
 }
 
@@ -174,6 +269,9 @@ export type DbOrder = {
   status: OrderStatus
   payment_method: PaymentMethod
   payment_status: PaymentStatus
+  payment_trx_id: string | null
+  seller_payout_status: 'UNSETTLED' | 'SETTLED' | 'HELD'
+  payout_notes: string | null
   subtotal: number
   delivery_fee: number
   discount: number

@@ -34,14 +34,13 @@ export async function ensureSeeded() {
       email: 'buyer@example.com',
       passwordHash: password,
       name: 'Tanvir Ahmed',
-      role: 'SELLER',
+      role: 'BUYER',
+      hasBuyerAccount: true,
+      hasSellerAccount: false,
       studentId: '22041108',
       department: 'ICE / FST',
       phone: '+880 1711 234567',
       isBupVerified: true,
-      storeName: "Tanvir's Campus Stall",
-      storeDescription: "Tanvir's campus corner on BUP Nest",
-      sellerType: 'Student Vendor',
     })
 
     const sellers = [
@@ -144,8 +143,51 @@ export async function ensureSeeded() {
           p.mealType ?? null
         )
       }
-    } else if (p.mealType) {
-      db.prepare('UPDATE products SET meal_type = ? WHERE id = ?').run(p.mealType, existing.id)
+    } else {
+      if (p.mealType) {
+        db.prepare('UPDATE products SET meal_type = ? WHERE id = ?').run(p.mealType, existing.id)
+      }
+      if (p.image && p.image !== existing.id) {
+        db.prepare('UPDATE products SET image = ? WHERE id = ?').run(p.image, existing.id)
+      }
     }
+  }
+
+  // Seed sample stall bookings if table is empty
+  const bookingCount = db.prepare('SELECT COUNT(*) as count FROM stall_bookings').get() as { count: number }
+  if (bookingCount.count === 0) {
+    const tanvir = db.prepare("SELECT id FROM users WHERE email = 'buyer@example.com'").get() as { id: string } | undefined
+    if (tanvir) {
+      db.prepare(
+        `INSERT INTO stall_bookings 
+          (id, stall_id, user_id, club_name, purpose, booking_date, duration_days, total_cost, pass_code, status, admin_notes, created_at)
+         VALUES 
+          ('sb-sample-1', 'stall-1', ?, 'BUP Robotics Syndicate', 'Winter Tech Expo Merchandise & Arduino Starter Kits', '2026-11-28', 2, 2550, 'STALL-stall-1-8492', 'PENDING_APPROVAL', NULL, datetime('now')),
+          ('sb-sample-2', 'stall-4', ?, 'BUP Cultural Forum', 'Traditional Handloom Crafts & Batch Hoodies Pop-up', '2026-11-25', 1, 1020, 'STALL-stall-4-3914', 'APPROVED', 'Approved by Dean FST for Cultural Week', datetime('now', '-2 days'))`
+      ).run(tanvir.id, tanvir.id)
+    }
+  }
+
+  // Seed initial audit log if empty
+  const auditCount = db.prepare('SELECT COUNT(*) as count FROM audit_logs').get() as { count: number }
+  if (auditCount.count === 0) {
+    const adminUser = db.prepare("SELECT id, name FROM users WHERE role = 'ADMIN'").get() as { id: string; name: string } | undefined
+    if (adminUser) {
+      db.prepare(
+        `INSERT INTO audit_logs (id, admin_id, admin_name, action, target_entity, target_id, details, created_at)
+         VALUES ('log-init-1', ?, ?, 'SYSTEM_BOOT', 'PLATFORM', 'INIT', 'System initialized with campus multi-vendor parameters', datetime('now'))`
+      ).run(adminUser.id, adminUser.name)
+    }
+  }
+
+  // Seed default platform settings if empty
+  const settingCount = db.prepare('SELECT COUNT(*) as count FROM platform_settings').get() as { count: number }
+  if (settingCount.count === 0) {
+    db.prepare(
+      `INSERT INTO platform_settings (key, value, updated_at) VALUES
+        ('announcement_banner', 'Welcome to BUP Nest: Winter Season 2026! Verified student discounts apply across all stalls.', datetime('now')),
+        ('student_discount_pct', '5', datetime('now')),
+        ('delivery_fee_bdt', '60', datetime('now'))`
+    ).run()
   }
 }

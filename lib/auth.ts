@@ -16,6 +16,9 @@ export type SessionUser = {
   studentId: string | null
   isBupVerified: boolean
   storeName: string | null
+  hasBuyerAccount: boolean
+  hasSellerAccount: boolean
+  isBothConnected: boolean
 }
 
 export async function hashPassword(password: string) {
@@ -27,6 +30,8 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 function toSession(user: DbUser): SessionUser {
+  const hasBuyer = user.role === 'ADMIN' || Boolean(user.has_buyer_account ?? (user.role === 'BUYER' ? 1 : 0))
+  const hasSeller = user.role === 'ADMIN' || Boolean(user.has_seller_account ?? (user.role === 'SELLER' ? 1 : 0))
   return {
     id: user.id,
     email: user.email,
@@ -36,15 +41,22 @@ function toSession(user: DbUser): SessionUser {
     studentId: user.student_id,
     isBupVerified: !!user.is_bup_verified,
     storeName: user.store_name,
+    hasBuyerAccount: hasBuyer,
+    hasSellerAccount: hasSeller,
+    isBothConnected: hasBuyer && hasSeller,
   }
 }
 
-export async function createSession(user: DbUser | { id: string; email: string; name: string; role: Role }) {
+export async function createSession(user: DbUser) {
+  const sessionUser = toSession(user)
   const token = await new SignJWT({
-    sub: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
+    sub: sessionUser.id,
+    email: sessionUser.email,
+    name: sessionUser.name,
+    role: sessionUser.role,
+    hasBuyerAccount: sessionUser.hasBuyerAccount,
+    hasSellerAccount: sessionUser.hasSellerAccount,
+    isBothConnected: sessionUser.isBothConnected,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -89,6 +101,9 @@ export async function getSession(): Promise<SessionUser | null> {
         studentId: user.studentId,
         isBupVerified: user.isBupVerified,
         storeName: user.storeName,
+        hasBuyerAccount: true,
+        hasSellerAccount: user.role === 'SELLER' || user.role === 'ADMIN',
+        isBothConnected: user.role === 'SELLER' || user.role === 'ADMIN',
       }
     }
 
@@ -104,14 +119,22 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function requireUser(roles?: Role[]) {
   const user = await getSession()
   if (!user) throw new Error('Unauthorized')
-  // Unified accounts: all authenticated users can buy and sell.
-  // Allow any authenticated user unless a strict ADMIN-only role is specified.
-  if (roles && !roles.includes(user.role) && user.role !== 'ADMIN') {
-    if (roles.includes('SELLER') || roles.includes('BUYER')) {
-      return user
-    }
-    throw new Error('Forbidden')
+  if (roles) {
+    if (user.role === 'ADMIN') return user
+    const isAllowed = roles.some((r) => {
+      if (r === 'BUYER') return user.hasBuyerAccount
+      if (r === 'SELLER') return user.hasSellerAccount
+      return user.role === r
+    })
+    if (!isAllowed) throw new Error('Forbidden')
   }
+  return user
+}
+
+export async function requireAdmin() {
+  const user = await getSession()
+  if (!user) throw new Error('Unauthorized')
+  if (user.role !== 'ADMIN') throw new Error('Forbidden: Platform Administrator access required')
   return user
 }
 

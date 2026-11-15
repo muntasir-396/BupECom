@@ -55,16 +55,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
-
-# OS Metadata & IDE files
-.DS_Store
-Thumbs.db
-*.pem
-.idea/
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+scratch/

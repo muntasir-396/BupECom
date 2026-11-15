@@ -31,6 +31,8 @@ import { useWorkspace } from './WorkspaceContext'
 import { ExtravagantStallSection } from '@/components/bup/ExtravagantStallSection'
 import { createProductAction } from '@/lib/actions/products'
 import type { SessionUser } from '@/lib/auth'
+import { UpgradeToSellerForm } from '@/components/marketplace/UpgradeToSellerForm'
+import { openBuyerAccountAction } from '@/lib/actions/auth'
 
 interface SellerWorkspaceProps {
   products: Product[]
@@ -59,8 +61,9 @@ export function SellerWorkspace({
   cartCount = 0,
   currentUser: propUser,
 }: SellerWorkspaceProps) {
-  const { setActiveTab, user: contextUser } = useWorkspace()
+  const { user: contextUser, hasSellerAccount, hasBuyerAccount, isBothConnected, setActiveTab } = useWorkspace()
   const activeUser = propUser || contextUser
+  const user = activeUser
   const [internalSubTab, setInternalSubTab] = useState<'overview' | 'listings' | 'stalls' | 'guidelines'>('overview')
 
   const activeSubTab = controlledSubTab ?? internalSubTab
@@ -94,7 +97,7 @@ export function SellerWorkspace({
     price: '',
     seller: '',
     description: '',
-    image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+    image: '/images/products/bup-varsity-hoodie.jpg',
     deliveryTime: 'Same Day at Campus Booth or Delivery',
     tag: 'New Drop',
   })
@@ -117,7 +120,7 @@ export function SellerWorkspace({
       data.set('category', formData.category)
       data.set('price', formData.price)
       data.set('description', formData.description || 'Verified campus product sold by BUP student merchant.')
-      data.set('image', formData.image || '/images/1.jfif')
+      data.set('image', formData.image || '/images/products/bup-varsity-hoodie.jpg')
       data.set('stock', '15')
       data.set('tag', formData.tag || 'New Drop')
       data.set('deliveryTime', formData.deliveryTime)
@@ -133,7 +136,7 @@ export function SellerWorkspace({
           reviewsCount: 1,
           seller: activeUser.storeName || activeUser.name || formData.seller || 'BUP Student Vendor',
           sellerType: 'Student Vendor',
-          image: formData.image || '/images/1.jfif',
+          image: formData.image || '/images/products/bup-varsity-hoodie.jpg',
           description: formData.description || 'Verified campus product sold by BUP student merchant.',
           inStock: true,
           tag: formData.tag || 'New Drop',
@@ -148,7 +151,7 @@ export function SellerWorkspace({
           price: '',
           seller: activeUser.storeName || activeUser.name || 'BUP Student Entrepreneur',
           description: '',
-          image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+          image: '/images/products/bup-varsity-hoodie.jpg',
           deliveryTime: 'Same Day at Campus Booth or Delivery',
           tag: 'New Drop',
         })
@@ -162,6 +165,69 @@ export function SellerWorkspace({
     }
   }
 
+  // Case 1: User is not logged in
+  if (!user) {
+    return (
+      <div className="w-full bg-[#FAF5E9] py-20 px-4 min-h-[75vh] flex items-center justify-center">
+        <div className="max-w-md w-full rounded-3xl border border-[#392525]/15 bg-white p-8 text-center shadow-xl">
+          <div className="size-16 mx-auto rounded-2xl bg-[#080d0a] text-[#E3E890] grid place-items-center shadow-md mb-5">
+            <Store className="size-8" />
+          </div>
+          <span className="inline-block rounded-full bg-[#E3E890]/40 border border-[#392525]/15 px-3 py-1 text-xs font-semibold text-[#392525] mb-2">
+            Separate Account Access
+          </span>
+          <h2 className="font-serif text-3xl font-bold text-[#392525]">Seller Studio</h2>
+          <p className="mt-2 text-sm text-[#3E4734] leading-relaxed">
+            Buyer and Seller accounts are kept separate. To access vendor listings, sales analytics, and campus stall management, please sign in with your Seller account.
+          </p>
+          <div className="mt-6 flex flex-col gap-2.5">
+            <Link
+              href="/login?redirect=/?tab=seller"
+              className="w-full rounded-full bg-[#392525] py-3 text-sm font-semibold text-[#FAF5E9] shadow-md hover:bg-[#213527] transition text-center"
+            >
+              Sign in to Seller Account
+            </Link>
+            <Link
+              href="/register?role=SELLER"
+              className="w-full rounded-full border border-[#392525]/20 bg-white/70 py-3 text-sm font-semibold text-[#392525] hover:bg-white transition text-center"
+            >
+              Register New Seller Account
+            </Link>
+            <button
+              onClick={() => setActiveTab('buyer')}
+              className="mt-2 text-xs text-[#728383] hover:text-[#392525] transition underline cursor-pointer"
+            >
+              Continue browsing Buyer Market →
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Case 2: User is logged in as a Buyer only (no Seller account opened yet)
+  if (!hasSellerAccount) {
+    return (
+      <div className="w-full bg-[#FAF5E9] py-14 px-4 min-h-[75vh]">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-600/30 px-3 py-1 text-xs font-semibold text-amber-900">
+              <span className="size-2 rounded-full bg-amber-500" />
+              <span>Current Account: Buyer Account ({user.name})</span>
+            </div>
+            <button
+              onClick={() => setActiveTab('buyer')}
+              className="text-xs font-medium text-[#728383] hover:text-[#392525] underline cursor-pointer"
+            >
+              ← Back to Buyer Market
+            </button>
+          </div>
+          <UpgradeToSellerForm userName={user.name} userPhone={user.phone} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full bg-[#0e1711] text-[#FAF5E9] pb-24 min-h-screen relative overflow-hidden">
       
@@ -170,6 +236,47 @@ export function SellerWorkspace({
         <div className="absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-emerald-900/20 blur-3xl" />
         <div className="absolute top-1/2 right-1/4 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
       </div>
+
+      {/* Account Connection Status Bar */}
+      {isBothConnected ? (
+        <div className="relative z-10 bg-emerald-950/80 border-b border-emerald-500/30 px-4 py-2.5 text-xs text-emerald-200">
+          <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>✨ <strong>Connected Accounts:</strong> You have both <strong>Buyer</strong> and <strong>Seller</strong> accounts connected. You can freely switch between them.</span>
+            </div>
+            <button
+              onClick={() => setActiveTab('buyer')}
+              className="font-semibold text-[#E3E890] hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Switch to Buyer Market</span>
+              <ArrowRight className="size-3" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative z-10 bg-[#141f17] border-b border-white/10 px-4 py-2.5 text-xs text-white/80">
+          <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-indigo-400" />
+              <span>🏪 <strong>Seller Account Active.</strong> You have not connected a Buyer account yet.</span>
+            </div>
+            <form
+              action={async () => {
+                await openBuyerAccountAction()
+                window.location.reload()
+              }}
+            >
+              <button
+                type="submit"
+                className="rounded-full bg-[#E3E890] px-3 py-1 text-xs font-bold text-[#141f17] shadow-sm hover:bg-white transition cursor-pointer"
+              >
+                + Open Buyer Account &amp; Connect Both
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* SELLER STUDIO HERO HEADER (MERGED WITH /SELL HERO) */}
       <section className="relative border-b border-white/10 bg-[#080d0a] px-4 py-8 text-[#FAF5E9] sm:px-8 sm:py-12 overflow-hidden">
@@ -731,13 +838,76 @@ export function SellerWorkspace({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/90">Image URL</label>
-                <input
-                  type="url"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-white/40 focus:border-[#E3E890] focus:outline-none focus:bg-white/15"
-                />
+                <label className="block text-xs font-bold text-white/90">Product Image (Real Photo / Path)</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="/images/products/... or image URL"
+                    className="w-full rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-white/40 focus:border-[#E3E890] focus:outline-none focus:bg-white/15"
+                  />
+                  <label className="cursor-pointer shrink-0 rounded-xl border border-[#E3E890]/40 bg-[#E3E890]/20 px-3 py-2 text-xs font-bold text-[#E3E890] hover:bg-[#E3E890]/30 transition flex items-center gap-1">
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setFormData({ ...formData, image: evt.target.result as string })
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Quick Real Campus Presets */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'Mocha Wool Shawl', url: '/images/products/mens-paisley-wool-shawl.jpg' },
+                    { label: 'Striped Rugby Polo', url: '/images/products/varsity-striped-rugby-polo.jpg' },
+                    { label: 'Corduroy Shacket', url: '/images/products/slate-blue-corduroy-shacket.jpg' },
+                    { label: 'Emerald Green Shawl', url: '/images/products/womens-emerald-woven-shawl.jpg' },
+                    { label: 'Varsity Hoodie', url: '/images/products/bup-varsity-hoodie.jpg' },
+                    { label: 'Canteen Khichuri & Ilish', url: '/images/products/khichuri-ilish-platter.jpg' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: preset.url })}
+                      className={`rounded-lg px-2 py-0.5 text-[10px] font-medium transition ${
+                        formData.image === preset.url
+                          ? 'bg-[#E3E890] text-[#141f17] font-bold'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Image Live Thumbnail */}
+                {formData.image && (
+                  <div className="mt-2.5 flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 p-2">
+                    <img
+                      src={formData.image}
+                      alt="Thumbnail"
+                      className="size-12 rounded-lg object-cover border border-white/15 shrink-0"
+                    />
+                    <div className="text-[11px] text-white/70 truncate">
+                      <p className="font-semibold text-white">Selected Image</p>
+                      <p className="truncate text-white/50">{formData.image}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
