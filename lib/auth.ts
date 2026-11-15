@@ -52,10 +52,11 @@ export async function createSession(user: DbUser | { id: string; email: string; 
     .sign(secret())
 
   const cookieStore = await cookies()
+  const isHttps = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https') || false
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isHttps,
     path: '/',
     maxAge: 60 * 60 * 24 * 30,
   })

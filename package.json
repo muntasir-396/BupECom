@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:seed": "node --env-file=.env.local scripts/seed.mjs",
     "db:reset": "rm -f data/marketplace.db && echo 'Database cleared. Restart the app to reseed.'"
   },
   "dependencies": {

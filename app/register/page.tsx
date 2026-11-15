@@ -40,6 +40,8 @@ function RegisterForm() {
       </div>
 
       <form
+        method="POST"
+        action="#"
         className="mt-6 space-y-4"
         onSubmit={(e) => {
           e.preventDefault()

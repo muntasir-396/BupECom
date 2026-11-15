@@ -47,9 +47,11 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
 
   // Unified account: ensure all accounts have full buying and selling privileges
   if (user.role === 'BUYER') {
-    const db = getDb()
-    db.prepare(`UPDATE users SET role = 'SELLER', store_name = COALESCE(store_name, ? || '''s Stall') WHERE id = ?`).run(user.name, user.id)
-    user = (await findUserByEmail(parsed.data.email))!
+    const upgraded = await upgradeUserToSeller(user.id, {
+      storeName: user.store_name || `${user.name}'s Stall`,
+      sellerType: user.seller_type || 'Student Vendor',
+    })
+    if (upgraded) user = upgraded
   }
 
   await createSession(user)

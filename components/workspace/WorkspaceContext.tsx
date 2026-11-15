@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import type { SessionUser } from '@/lib/auth'
 
 export type WorkspaceTab = 'hub' | 'buyer' | 'seller'
 
@@ -11,15 +12,27 @@ interface WorkspaceContextType {
   isTransitioning: boolean
   slideNext: () => void
   slidePrev: () => void
+  user: SessionUser | null
 }
 
 const TABS: WorkspaceTab[] = ['hub', 'buyer', 'seller']
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null)
 
-export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+export function WorkspaceProvider({
+  children,
+  user = null,
+}: {
+  children: React.ReactNode
+  user?: SessionUser | null
+}) {
   const [activeTab, setActiveTabState] = useState<WorkspaceTab>('hub')
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(user)
+
+  useEffect(() => {
+    setCurrentUser(user)
+  }, [user])
 
   // Initialize from URL search param if present (?tab=buyer or ?tab=seller)
   useEffect(() => {
@@ -116,6 +129,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         isTransitioning,
         slideNext,
         slidePrev,
+        user: currentUser,
       }}
     >
       {children}

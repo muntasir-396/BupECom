@@ -41,7 +41,7 @@ import { SellerWorkspace } from '@/components/workspace/SellerWorkspace'
 
 export default function Page() {
   const { items: cartItems, addItem, updateQty, removeItem, clear: clearCart, count: totalCartCount } = useCart()
-  const { activeTab, setActiveTab, tabIndex, isTransitioning } = useWorkspace()
+  const { activeTab, setActiveTab, tabIndex, isTransitioning, user } = useWorkspace()
 
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [productsList, setProductsList] = useState<Product[]>(PRODUCTS)
@@ -646,6 +646,7 @@ export default function Page() {
             <SellerWorkspace
               products={productsList}
               stalls={stallsList}
+              currentUser={user}
               onAddNewProduct={handleAddNewProduct}
               onDeleteProduct={handleDeleteProduct}
               onToggleStock={handleToggleStock}
@@ -664,9 +665,9 @@ export default function Page() {
       {activeTab === 'hub' && (
         <BottomDock
           cartCount={totalCartCount}
-          currentUser={null}
+          currentUser={user as any}
           onOpenCart={() => {
-            window.location.href = '/cart'
+            setIsCartOpen(true)
           }}
           onOpenAuth={() => {
             window.location.href = '/login'
@@ -691,7 +692,7 @@ export default function Page() {
       <StallBookingModal
         stall={selectedStall}
         onClose={() => setSelectedStall(null)}
-        currentUser={null}
+        currentUser={user as any}
         onOpenAuth={() => {
           window.location.href = '/login'
         }}
@@ -719,6 +720,7 @@ export default function Page() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
+        currentUser={user as any}
         items={cartItems.map((line) => {
           const match = productsList.find((p) => p.id === line.productId)
           return {
@@ -747,7 +749,6 @@ export default function Page() {
         }}
         onRemoveItem={(pid) => removeItem(pid)}
         onClearCart={() => clearCart()}
-        currentUser={null}
         onOpenAuth={() => {
           window.location.href = '/login'
         }}

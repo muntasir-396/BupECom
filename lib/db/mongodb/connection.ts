@@ -1,4 +1,10 @@
 import mongoose from 'mongoose'
+import dns from 'node:dns'
+
+// Ensure DNS SRV lookups work reliably on Windows/local ISP resolvers
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1'])
+} catch {}
 
 declare global {
   // eslint-disable-next-line no-var

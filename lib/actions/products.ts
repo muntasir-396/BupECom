@@ -6,13 +6,13 @@ import { requireUser } from '@/lib/auth'
 import { createProduct, deleteProduct, updateProduct, addOrUpdateReview } from '@/lib/catalog'
 
 const productSchema = z.object({
-  name: z.string().min(3),
-  description: z.string().min(10),
+  name: z.string().min(3, 'Product name must be at least 3 characters'),
+  description: z.string().min(3, 'Description must be at least 3 characters'),
   category: z.string().min(2),
-  price: z.coerce.number().positive(),
+  price: z.coerce.number().positive('Price must be greater than 0'),
   originalPrice: z.coerce.number().positive().optional().nullable(),
-  image: z.string().url(),
-  stock: z.coerce.number().int().min(0),
+  image: z.string().min(1, 'Please provide an image URL or path'),
+  stock: z.coerce.number().int().min(0).default(10),
   tag: z.string().optional().nullable(),
   deliveryTime: z.string().optional(),
 })
@@ -28,12 +28,15 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
       category: formData.get('category'),
       price: formData.get('price'),
       originalPrice: formData.get('originalPrice') || null,
-      image: formData.get('image'),
-      stock: formData.get('stock'),
+      image: formData.get('image') || '/images/1.jfif',
+      stock: formData.get('stock') || 10,
       tag: formData.get('tag') || null,
       deliveryTime: formData.get('deliveryTime') || '2-4 days',
     })
-    if (!parsed.success) return { ok: false, error: 'Please check product fields' }
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || 'Please check product fields'
+      return { ok: false, error: firstError }
+    }
 
     const product = await createProduct({
       sellerId: user.id,
@@ -45,8 +48,8 @@ export async function createProductAction(formData: FormData): Promise<ActionRes
     revalidatePath('/buyer')
     revalidatePath('/')
     return { ok: true, id: product.id }
-  } catch {
-    return { ok: false, error: 'You must be a seller to list products' }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'You must be a seller to list products' }
   }
 }
 

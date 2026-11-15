@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import {
   Store,
   Plus,
@@ -21,11 +23,14 @@ import {
   Layers,
   X,
   Zap,
-  Users
+  Users,
+  Lock
 } from 'lucide-react'
 import { Product, Stall } from '@/lib/types'
 import { useWorkspace } from './WorkspaceContext'
 import { ExtravagantStallSection } from '@/components/bup/ExtravagantStallSection'
+import { createProductAction } from '@/lib/actions/products'
+import type { SessionUser } from '@/lib/auth'
 
 interface SellerWorkspaceProps {
   products: Product[]
@@ -38,6 +43,7 @@ interface SellerWorkspaceProps {
   onSubTabChange?: (tab: 'overview' | 'listings' | 'stalls' | 'guidelines') => void
   onOpenCart?: () => void
   cartCount?: number
+  currentUser?: SessionUser | null
 }
 
 export function SellerWorkspace({
@@ -51,8 +57,10 @@ export function SellerWorkspace({
   onSubTabChange,
   onOpenCart,
   cartCount = 0,
+  currentUser: propUser,
 }: SellerWorkspaceProps) {
-  const { setActiveTab } = useWorkspace()
+  const { setActiveTab, user: contextUser } = useWorkspace()
+  const activeUser = propUser || contextUser
   const [internalSubTab, setInternalSubTab] = useState<'overview' | 'listings' | 'stalls' | 'guidelines'>('overview')
 
   const activeSubTab = controlledSubTab ?? internalSubTab
@@ -61,51 +69,97 @@ export function SellerWorkspace({
     setInternalSubTab(tab)
   }
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false)
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleOpenAddModal = () => {
+    if (!activeUser) {
+      setIsAuthPromptOpen(true)
+    } else {
+      setFormError('')
+      setIsNewProductModalOpen(true)
+    }
+  }
 
   // Form State for New Product
   const [formData, setFormData] = useState({
     name: '',
     category: 'Merch' as Product['category'],
     price: '',
-    seller: 'BUP Student Entrepreneur',
+    seller: '',
     description: '',
     image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
     deliveryTime: 'Same Day at Campus Booth or Delivery',
     tag: 'New Drop',
   })
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.name || !formData.price) return
-
-    const newProd: Product = {
-      id: `prod-custom-${Date.now()}`,
-      name: formData.name,
-      category: formData.category,
-      price: Number(formData.price),
-      rating: 5.0,
-      reviewsCount: 1,
-      seller: formData.seller || 'BUP Student Vendor',
-      sellerType: 'Student Vendor',
-      image: formData.image,
-      description: formData.description || 'Verified campus product sold by BUP student merchant.',
-      inStock: true,
-      tag: formData.tag || 'New Drop',
-      deliveryTime: formData.deliveryTime,
+    if (!activeUser) {
+      setIsNewProductModalOpen(false)
+      setIsAuthPromptOpen(true)
+      return
     }
 
-    onAddNewProduct(newProd)
-    setIsNewProductModalOpen(false)
-    setFormData({
-      name: '',
-      category: 'Merch',
-      price: '',
-      seller: 'BUP Student Entrepreneur',
-      description: '',
-      image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
-      deliveryTime: 'Same Day at Campus Booth or Delivery',
-      tag: 'New Drop',
-    })
+    setIsSubmitting(true)
+    setFormError('')
+
+    try {
+      const data = new FormData()
+      data.set('name', formData.name)
+      data.set('category', formData.category)
+      data.set('price', formData.price)
+      data.set('description', formData.description || 'Verified campus product sold by BUP student merchant.')
+      data.set('image', formData.image || '/images/1.jfif')
+      data.set('stock', '15')
+      data.set('tag', formData.tag || 'New Drop')
+      data.set('deliveryTime', formData.deliveryTime)
+
+      const result = await createProductAction(data)
+      if (result.ok) {
+        const newProd: Product = {
+          id: result.id || `prod-custom-${Date.now()}`,
+          name: formData.name,
+          category: formData.category,
+          price: Number(formData.price),
+          rating: 5.0,
+          reviewsCount: 1,
+          seller: activeUser.storeName || activeUser.name || formData.seller || 'BUP Student Vendor',
+          sellerType: 'Student Vendor',
+          image: formData.image || '/images/1.jfif',
+          description: formData.description || 'Verified campus product sold by BUP student merchant.',
+          inStock: true,
+          tag: formData.tag || 'New Drop',
+          deliveryTime: formData.deliveryTime,
+        }
+
+        onAddNewProduct(newProd)
+        setIsNewProductModalOpen(false)
+        setFormData({
+          name: '',
+          category: 'Merch',
+          price: '',
+          seller: activeUser.storeName || activeUser.name || 'BUP Student Entrepreneur',
+          description: '',
+          image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+          deliveryTime: 'Same Day at Campus Booth or Delivery',
+          tag: 'New Drop',
+        })
+      } else {
+        setFormError(result.error || 'Failed to list product. Please try again.')
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Error creating product')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -152,7 +206,7 @@ export function SellerWorkspace({
             {/* Quick Action Buttons */}
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => setIsNewProductModalOpen(true)}
+                onClick={handleOpenAddModal}
                 className="inline-flex items-center gap-2 rounded-full bg-[#E3E890] px-5 py-2.5 text-xs font-bold text-[#141f17] shadow-lg transition hover:bg-white active:scale-95 cursor-pointer"
               >
                 <Plus className="size-4" />
@@ -281,7 +335,7 @@ export function SellerWorkspace({
           </div>
 
           <button
-            onClick={() => setIsNewProductModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="hidden items-center gap-1.5 rounded-full bg-[#E3E890] px-4 py-1.5 text-xs font-bold text-[#141f17] shadow-sm hover:bg-white transition sm:inline-flex cursor-pointer shrink-0"
           >
             <Plus className="size-3.5" />
@@ -393,7 +447,7 @@ export function SellerWorkspace({
                   List items with photos, prices, and delivery terms in under 30 seconds.
                 </p>
                 <button
-                  onClick={() => setIsNewProductModalOpen(true)}
+                  onClick={handleOpenAddModal}
                   className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#E3E890] px-5 py-2.5 text-xs font-bold text-[#141f17] shadow-lg hover:bg-white transition cursor-pointer"
                 >
                   <Plus className="size-4" />
@@ -596,8 +650,8 @@ export function SellerWorkspace({
       )}
 
       {/* MODAL: LIST NEW PRODUCT */}
-      {isNewProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-in fade-in">
+      {mounted && isNewProductModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-in fade-in">
           <div className="relative w-full max-w-lg rounded-3xl border border-white/20 bg-[#141f17] p-6 shadow-2xl sm:p-8 text-white">
             <button
               onClick={() => setIsNewProductModalOpen(false)}
@@ -615,6 +669,12 @@ export function SellerWorkspace({
             <p className="mt-1 text-xs text-white/70">
               Your item will appear instantly in Buyer Market for student buyers.
             </p>
+
+            {formError && (
+              <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                {formError}
+              </div>
+            )}
 
             <form onSubmit={handleCreateProduct} className="mt-5 space-y-4">
               <div>
@@ -701,14 +761,59 @@ export function SellerWorkspace({
                 </button>
                 <button
                   type="submit"
-                  className="rounded-full bg-[#E3E890] px-6 py-2.5 text-xs font-bold text-[#141f17] shadow-md hover:bg-white transition"
+                  disabled={isSubmitting}
+                  className="rounded-full bg-[#E3E890] px-6 py-2.5 text-xs font-bold text-[#141f17] shadow-md hover:bg-white transition disabled:opacity-50 cursor-pointer"
                 >
-                  Publish Listing
+                  {isSubmitting ? 'Publishing…' : 'Publish Listing'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* AUTH REQUIRED PROMPT MODAL */}
+      {mounted && isAuthPromptOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in">
+          <div className="relative w-full max-w-md rounded-3xl border border-white/20 bg-[#141f17] p-6 shadow-2xl sm:p-8 text-white text-center">
+            <button
+              type="button"
+              onClick={() => setIsAuthPromptOpen(false)}
+              className="absolute right-5 top-5 grid size-8 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#E3E890] text-[#141f17] shadow-lg">
+              <Store className="size-7" />
+            </div>
+
+            <h3 className="mt-4 font-serif text-2xl font-bold text-white">
+              Sign In to Add Items
+            </h3>
+            <p className="mt-2 text-xs text-white/70 leading-relaxed">
+              You must be signed in with your campus account to list varsity apparel, textbooks, or cafeteria menus on BUP Nest.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2.5">
+              <Link
+                href="/login?redirect=/?tab=seller"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#E3E890] py-3 text-xs font-bold text-[#141f17] shadow-md hover:bg-white transition"
+              >
+                <span>Sign in with Campus Account</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+              <Link
+                href="/register?redirect=/?tab=seller"
+                className="w-full rounded-full border border-white/20 bg-white/10 py-3 text-xs font-semibold text-white hover:bg-white/20 transition"
+              >
+                Create a New Account
+              </Link>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* FLOATING ACTION CART PILL (Fixed Bottom-Right when items are in cart) */}

@@ -278,7 +278,7 @@ export function AuthModal({ isOpen, onClose, onSuccessLogin, initialTab = 'bup' 
                 </div>
               )}
 
-              <form onSubmit={handleBupLogin} className="space-y-3.5">
+              <form method="POST" onSubmit={handleBupLogin} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[#3E4734]">
                     Student or Faculty ID
@@ -391,7 +391,7 @@ export function AuthModal({ isOpen, onClose, onSuccessLogin, initialTab = 'bup' 
                 </div>
               )}
 
-              <form onSubmit={handleOutsideLogin} className="space-y-3.5">
+              <form method="POST" onSubmit={handleOutsideLogin} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[#3E4734]">
                     Email or Phone
@@ -491,7 +491,7 @@ export function AuthModal({ isOpen, onClose, onSuccessLogin, initialTab = 'bup' 
                 </div>
               )}
 
-              <form onSubmit={handleOutsideRegister} className="space-y-3">
+              <form method="POST" onSubmit={handleOutsideRegister} className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[#3E4734]">
                     Full Name *
