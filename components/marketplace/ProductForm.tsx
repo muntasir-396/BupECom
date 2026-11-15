@@ -22,19 +22,44 @@ type ProductFormValues = {
 
 const PRESET_IMAGES = [
   {
+    label: 'Mocha Wool Shawl',
+    category: 'Merch',
+    url: '/images/products/mens-paisley-wool-shawl.jpg',
+  },
+  {
+    label: 'Striped Rugby Polo',
+    category: 'Merch',
+    url: '/images/products/varsity-striped-rugby-polo.jpg',
+  },
+  {
+    label: 'Corduroy Shacket',
+    category: 'Merch',
+    url: '/images/products/slate-blue-corduroy-shacket.jpg',
+  },
+  {
+    label: 'Emerald Green Shawl',
+    category: 'Merch',
+    url: '/images/products/womens-emerald-woven-shawl.jpg',
+  },
+  {
     label: 'Varsity Hoodie',
     category: 'Merch',
-    url: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+    url: '/images/products/bup-varsity-hoodie.jpg',
   },
   {
-    label: 'Campus T-Shirt',
-    category: 'Merch',
-    url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80',
+    label: 'Canteen Khichuri & Ilish',
+    category: 'Dining & Canteen',
+    url: '/images/products/khichuri-ilish-platter.jpg',
   },
   {
-    label: 'Textbook / Notes',
+    label: 'Calculus & Notes',
     category: 'Textbooks',
-    url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+    url: '/images/products/calculus-textbook-notes.jpg',
+  },
+  {
+    label: 'Tuition & Study Media',
+    category: 'Merch',
+    url: '/images/products/tuition-media.jpg',
   },
   {
     label: 'Tech / Gadget',
@@ -42,14 +67,9 @@ const PRESET_IMAGES = [
     url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80',
   },
   {
-    label: 'Canteen Snack',
-    category: 'Dining & Canteen',
-    url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
-  },
-  {
     label: 'Notebook & Stationery',
     category: 'Stationery & Arts',
-    url: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=800&q=80',
+    url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
   },
 ]
 
@@ -61,7 +81,7 @@ export function ProductForm({ initial }: { initial?: ProductFormValues }) {
 
   const defaultImageUrl =
     initial?.image ||
-    'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80'
+    '/images/products/bup-varsity-hoodie.jpg'
 
   const [imageUrl, setImageUrl] = useState(defaultImageUrl)
   const [imgLoadError, setImgLoadError] = useState(false)
@@ -155,19 +175,42 @@ export function ProductForm({ initial }: { initial?: ProductFormValues }) {
       {/* Image Preview & URL section */}
       <div>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-[#392525]">Product Image URL *</span>
-          <input
-            name="image"
-            type="url"
-            required
-            value={imageUrl}
-            onChange={(e) => {
-              setImageUrl(e.target.value)
-              setImgLoadError(false)
-            }}
-            placeholder="https://images.unsplash.com/..."
-            className="w-full rounded-xl border border-[rgba(57,37,37,0.18)] bg-white/80 px-3.5 py-2.5 text-sm outline-none focus:border-[#B25D3E]"
-          />
+          <span className="mb-1 block font-medium text-[#392525]">Product Image URL or Path *</span>
+          <div className="flex gap-2">
+            <input
+              name="image"
+              type="text"
+              required
+              value={imageUrl}
+              onChange={(e) => {
+                setImageUrl(e.target.value)
+                setImgLoadError(false)
+              }}
+              placeholder="/images/products/... or https://..."
+              className="w-full rounded-xl border border-[rgba(57,37,37,0.18)] bg-white/80 px-3.5 py-2.5 text-sm outline-none focus:border-[#B25D3E]"
+            />
+            <label className="cursor-pointer shrink-0 rounded-xl border border-[rgba(57,37,37,0.18)] bg-white px-3 py-2.5 text-xs font-semibold text-[#392525] hover:bg-stone-50 transition flex items-center gap-1">
+              <span>Upload</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (evt) => {
+                      if (evt.target?.result) {
+                        setImageUrl(evt.target.result as string)
+                        setImgLoadError(false)
+                      }
+                    }
+                    reader.readAsDataURL(file)
+                  }
+                }}
+              />
+            </label>
+          </div>
         </label>
 
         {/* Quick image preset chips */}

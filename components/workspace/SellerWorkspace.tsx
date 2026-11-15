@@ -72,7 +72,7 @@ export function SellerWorkspace({
     price: '',
     seller: 'BUP Student Entrepreneur',
     description: '',
-    image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+    image: '/images/products/bup-varsity-hoodie.jpg',
     deliveryTime: 'Same Day at Campus Booth or Delivery',
     tag: 'New Drop',
   })
@@ -90,7 +90,7 @@ export function SellerWorkspace({
       reviewsCount: 1,
       seller: formData.seller || 'BUP Student Vendor',
       sellerType: 'Student Vendor',
-      image: formData.image,
+      image: formData.image || '/images/products/bup-varsity-hoodie.jpg',
       description: formData.description || 'Verified campus product sold by BUP student merchant.',
       inStock: true,
       tag: formData.tag || 'New Drop',
@@ -105,7 +105,7 @@ export function SellerWorkspace({
       price: '',
       seller: 'BUP Student Entrepreneur',
       description: '',
-      image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+      image: '/images/products/bup-varsity-hoodie.jpg',
       deliveryTime: 'Same Day at Campus Booth or Delivery',
       tag: 'New Drop',
     })
@@ -778,13 +778,76 @@ export function SellerWorkspace({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/90">Image URL</label>
-                <input
-                  type="url"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-white/40 focus:border-[#E3E890] focus:outline-none focus:bg-white/15"
-                />
+                <label className="block text-xs font-bold text-white/90">Product Image (Real Photo / Path)</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="/images/products/... or image URL"
+                    className="w-full rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-white/40 focus:border-[#E3E890] focus:outline-none focus:bg-white/15"
+                  />
+                  <label className="cursor-pointer shrink-0 rounded-xl border border-[#E3E890]/40 bg-[#E3E890]/20 px-3 py-2 text-xs font-bold text-[#E3E890] hover:bg-[#E3E890]/30 transition flex items-center gap-1">
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setFormData({ ...formData, image: evt.target.result as string })
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Quick Real Campus Presets */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'Mocha Wool Shawl', url: '/images/products/mens-paisley-wool-shawl.jpg' },
+                    { label: 'Striped Rugby Polo', url: '/images/products/varsity-striped-rugby-polo.jpg' },
+                    { label: 'Corduroy Shacket', url: '/images/products/slate-blue-corduroy-shacket.jpg' },
+                    { label: 'Emerald Green Shawl', url: '/images/products/womens-emerald-woven-shawl.jpg' },
+                    { label: 'Varsity Hoodie', url: '/images/products/bup-varsity-hoodie.jpg' },
+                    { label: 'Canteen Khichuri & Ilish', url: '/images/products/khichuri-ilish-platter.jpg' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: preset.url })}
+                      className={`rounded-lg px-2 py-0.5 text-[10px] font-medium transition ${
+                        formData.image === preset.url
+                          ? 'bg-[#E3E890] text-[#141f17] font-bold'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Image Live Thumbnail */}
+                {formData.image && (
+                  <div className="mt-2.5 flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 p-2">
+                    <img
+                      src={formData.image}
+                      alt="Thumbnail"
+                      className="size-12 rounded-lg object-cover border border-white/15 shrink-0"
+                    />
+                    <div className="text-[11px] text-white/70 truncate">
+                      <p className="font-semibold text-white">Selected Image</p>
+                      <p className="truncate text-white/50">{formData.image}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

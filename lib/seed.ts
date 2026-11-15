@@ -131,8 +131,13 @@ export async function ensureSeeded() {
           p.mealType ?? null
         )
       }
-    } else if (p.mealType) {
-      db.prepare('UPDATE products SET meal_type = ? WHERE id = ?').run(p.mealType, existing.id)
+    } else {
+      if (p.mealType) {
+        db.prepare('UPDATE products SET meal_type = ? WHERE id = ?').run(p.mealType, existing.id)
+      }
+      if (p.image && p.image !== existing.id) {
+        db.prepare('UPDATE products SET image = ? WHERE id = ?').run(p.image, existing.id)
+      }
     }
   }
 

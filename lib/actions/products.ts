@@ -11,7 +11,17 @@ const productSchema = z.object({
   category: z.string().min(2, 'Please select a category'),
   price: z.coerce.number().positive('Selling price must be greater than 0'),
   originalPrice: z.coerce.number().positive('Compare-at price must be greater than 0').optional().nullable(),
-  image: z.string().url('Product image must be a valid URL'),
+  image: z
+    .string()
+    .min(1, 'Product image is required')
+    .refine(
+      (val) =>
+        val.startsWith('http://') ||
+        val.startsWith('https://') ||
+        val.startsWith('/') ||
+        val.startsWith('data:image/'),
+      'Product image must be a valid URL or path'
+    ),
   stock: z.coerce.number().int().min(0, 'Available stock cannot be negative'),
   tag: z.string().optional().nullable(),
   deliveryTime: z.string().optional(),
